@@ -520,6 +520,8 @@ impl Client {
             let (server_info, stream) = connector.connect(use_backoff)?;
 
             let reader = BufReader::with_capacity(BUF_CAPACITY, stream.clone());
+            let ping_writer =
+                BufWriter::with_capacity(BUF_CAPACITY, stream.clone());
             let writer = BufWriter::with_capacity(BUF_CAPACITY, stream);
 
             // Set up the new connection for this client.
@@ -528,7 +530,7 @@ impl Client {
                 if !first_connect {
                     connector.get_options().reconnect_callback.call();
                 }
-                if self.dispatch(reader, &mut connector).is_ok() {
+                if self.dispatch(reader, ping_writer, &mut connector).is_ok() {
                     // If the client stopped gracefully, return.
                     return Ok(());
                 } else {
@@ -608,10 +610,41 @@ impl Client {
         Ok(())
     }
 
+    /// Reads messages from the server.
+    /// If the tcp stream is setup with a read timeout a read may return `ErrorKind::WouldBlock`
+    /// when no message is received within the timeout.
+    /// In such case send a Ping to the server which must respond within the read timeout,
+    /// otherwise the connection will be deemed as lost.
+    fn read_non_blocking(
+        mut reader: &mut impl BufRead,
+        mut ping_writer: &mut BufWriter<NatsStream>,
+    ) -> io::Result<Option<ServerOp>> {
+        match proto::decode(&mut reader) {
+            Ok(result) => Ok(result),
+            Err(error) => {
+                if error.kind() == ErrorKind::WouldBlock
+                    && proto::encode(&mut ping_writer, ClientOp::Ping).is_ok()
+                {
+                    ping_writer.flush()?;
+                    proto::decode(&mut reader)
+                } else {
+                    Err(error)
+                }
+            }
+        }
+    }
+
     /// Reads messages from the server and dispatches them to subscribers.
-    fn dispatch(&self, mut reader: impl BufRead, connector: &mut Connector) -> io::Result<()> {
+    fn dispatch(
+        &self,
+        mut reader: impl BufRead,
+        mut ping_writer: BufWriter<NatsStream>,
+        connector: &mut Connector,
+    ) -> io::Result<()> {
         // Handle operations received from the server.
-        while let Some(op) = proto::decode(&mut reader)? {
+        while let Some(op) =
+            Self::read_non_blocking(&mut reader, &mut ping_writer)?
+        {
             // Inject random delays when testing.
             inject_delay();
 

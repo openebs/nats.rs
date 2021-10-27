@@ -819,4 +819,29 @@ impl Options {
             inner: self.inner.add_root_certificate(path),
         }
     }
+
+    /// Sets the tcp read timeout to the timeout specified.
+    /// If the client does not receive any messages during this time it will attempt to ping the
+    /// server. If a pong is then received within a new read timeout the connection is maintained,
+    /// otherwise it will be dropped.
+    /// If the clients is busy receiving messages then no pings are sent. Conversely, an idle client
+    /// will keep sending pings and therefore a low timeout value may not be optimal.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// # smol::block_on(async {
+    /// let nc = nats::asynk::Options::new()
+    ///     .tcp_read_timeout(std::time::Duration::from_secs(20))
+    ///     .connect("tls://demo.nats.io:4443")
+    ///     .await?;
+    /// # std::io::Result::Ok(()) });
+    /// ```
+    pub fn tcp_read_timeout<T: Into<Option<Duration>>>(
+        self,
+        timeout: T,
+    ) -> Options {
+        Options {
+            inner: self.inner.tcp_read_timeout(timeout),
+        }
+    }
 }
