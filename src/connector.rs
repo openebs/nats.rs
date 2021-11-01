@@ -181,7 +181,10 @@ impl Connector {
 
                     // Check if connecting worked out.
                     let (server_info, stream) = match res {
-                        Ok(val) => val,
+                        Ok(val) => {
+                            log::debug!("Connected to {}", addr);
+                            val
+                        }
                         Err(err) => {
                             last_err = err;
                             continue;
@@ -189,8 +192,10 @@ impl Connector {
                     };
 
                     // Add URLs discovered through the INFO message.
-                    for url in &server_info.connect_urls {
-                        self.add_url(url)?;
+                    if self.options.cache_connect_urls {
+                        for url in &server_info.connect_urls {
+                            self.add_url(url)?;
+                        }
                     }
 
                     *self.attempts.get_mut(server).unwrap() = 0;
@@ -215,7 +220,10 @@ impl Connector {
         inject_io_failure()?;
 
         // Connect to the remote socket.
-        let mut stream = TcpStream::connect(addr)?;
+        let mut stream = match self.options.tcp_connect_timeout {
+            None => TcpStream::connect(addr),
+            Some(timeout) => TcpStream::connect_timeout(&addr, timeout),
+        }?;
         stream.set_nodelay(true)?;
         // set the read and write timeouts
         stream.set_read_timeout(self.options.tcp_read_timeout)?;

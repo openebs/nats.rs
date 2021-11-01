@@ -30,6 +30,9 @@ pub struct Options {
     pub(crate) jetstream_prefix: String,
 
     pub(crate) tcp_read_timeout: Option<Duration>,
+    pub(crate) tcp_connect_timeout: Option<Duration>,
+
+    pub(crate) cache_connect_urls: bool,
 }
 
 impl fmt::Debug for Options {
@@ -73,6 +76,8 @@ impl Default for Options {
             jetstream_prefix: "$JS.API.".to_string(),
             tls_client_config: crate::rustls::ClientConfig::default(),
             tcp_read_timeout: None,
+            tcp_connect_timeout: None,
+            cache_connect_urls: true,
         }
     }
 }
@@ -629,6 +634,46 @@ impl Options {
         timeout: T,
     ) -> Options {
         self.tcp_read_timeout = timeout.into();
+        self
+    }
+
+    /// Sets the tcp connect timeout to the timeout specified.
+    /// This timeout is used when connecting to a server address.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// # fn main() -> std::io::Result<()> {
+    ///
+    /// let nc = nats::Options::new()
+    ///     .tcp_connect_timeout(std::time::Duration::from_secs(5))
+    ///     .connect("tls://demo.nats.io:4443")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn tcp_connect_timeout<T: Into<Option<Duration>>>(
+        mut self,
+        timeout: T,
+    ) -> Options {
+        self.tcp_connect_timeout = timeout.into();
+        self
+    }
+
+    /// Caches the `connect_urls` returned by the remote nats-server's `ServerInfo`.
+    /// These urls are added to the vector of server urls which are used when attempting to
+    /// reestablish connection to a nats-server.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// # fn main() -> std::io::Result<()> {
+    ///
+    /// let nc = nats::Options::new()
+    ///     .cache_connect_urls(false)
+    ///     .connect("tls://demo.nats.io:4443")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn cache_connect_urls(mut self, cache_connect_urls: bool) -> Options {
+        self.cache_connect_urls = cache_connect_urls;
         self
     }
 }

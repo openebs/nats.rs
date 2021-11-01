@@ -844,4 +844,44 @@ impl Options {
             inner: self.inner.tcp_read_timeout(timeout),
         }
     }
+    /// Sets the tcp connect timeout to the timeout specified.
+    /// This timeout is used when connecting to a server address.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// # smol::block_on(async {
+    /// let nc = nats::asynk::Options::new()
+    ///     .tcp_connect_timeout(std::time::Duration::from_secs(5))
+    ///     .connect("tls://demo.nats.io:4443")
+    ///     .await?;
+    /// # std::io::Result::Ok(()) });
+    /// ```
+    pub fn tcp_connect_timeout<T: Into<Option<Duration>>>(
+        self,
+        timeout: T,
+    ) -> Options {
+        Options {
+            inner: self.inner.tcp_connect_timeout(timeout),
+        }
+    }
+
+    /// Caches the `connect_urls` returned by the remote nats-server's `ServerInfo`.
+    /// These urls are added to the vector of server urls which are used when attempting to
+    /// reestablish connection to a nats-server.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// # fn main() -> std::io::Result<()> {
+    ///
+    /// let nc = nats::Options::new()
+    ///     .cache_connect_urls(false)
+    ///     .connect("tls://demo.nats.io:4443")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn cache_connect_urls(self, cache_connect_urls: bool) -> Options {
+        Options {
+            inner: self.inner.cache_connect_urls(cache_connect_urls),
+        }
+    }
 }
